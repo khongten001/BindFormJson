@@ -33,19 +33,31 @@ type
     property JsonName : string read FJsonName write SetJsonName;
   end;
 
+  FbIgnorePut = class(TCustomAttribute)
+  end;
+
+  FbIgnorePost = class(TCustomAttribute)
+  end;
+
+  FbIgnoreDelete = class(TCustomAttribute)
+  end;
+
+  TTypeBindFormJson = (fbGet, fbPost, fbPut, fbDelete);
+
   iBindFormJson = interface
     ['{2846B843-7533-4987-B7B4-72F7B5654D1A}']
-    function FormToJson(aForm : TForm) : TJsonObject;
+    function FormToJson(aForm : TForm; aType : TTypeBindFormJson) : TJsonObject;
   end;
 
   TBindFormJson = class(TInterfacedObject, iBindFormJson)
     private
+      FJsonResult : TJsonObject;
       function __GetComponentToValue(aComponent: TComponent): TValue;
     public
       constructor Create;
       destructor Destroy; override;
       class function New : iBindFormJson;
-      function FormToJson(aForm : TForm) : TJsonObject;
+      function FormToJson(aForm : TForm; aType : TTypeBindFormJson) : TJsonObject;
   end;
 
 implementation
@@ -70,16 +82,16 @@ end;
 
 constructor TBindFormJson.Create;
 begin
-
+  FJsonResult := TJsonObject.Create;
 end;
 
 destructor TBindFormJson.Destroy;
 begin
-
+  FJsonResult.Free;
   inherited;
 end;
 
-function TBindFormJson.FormToJson(aForm: TForm): TJsonObject;
+function TBindFormJson.FormToJson(aForm : TForm; aType : TTypeBindFormJson) : TJsonObject;
 var
   ctxRtti : TRttiContext;
   typRtti : TRttiType;
@@ -93,11 +105,43 @@ begin
     begin
       if prpRtti.Tem<FieldJsonBind> then
       begin
-        Result
-          .AddPair(
-            prpRtti.GetAttribute<FieldJsonBind>.FJsonName,
-            __GetComponentToValue(aForm.FindComponent(prpRtti.Name)).ToString
-          );
+        case aType of
+          fbGet:
+          begin
+              Result
+                .AddPair(
+                  prpRtti.GetAttribute<FieldJsonBind>.FJsonName,
+                  __GetComponentToValue(aForm.FindComponent(prpRtti.Name)).ToString
+                );
+          end;
+          fbPost:
+          begin
+            if not prpRtti.Tem<FbIgnorePost> then
+              Result
+                .AddPair(
+                  prpRtti.GetAttribute<FieldJsonBind>.FJsonName,
+                  __GetComponentToValue(aForm.FindComponent(prpRtti.Name)).ToString
+                );
+          end;
+          fbPut:
+          begin
+            if not prpRtti.Tem<FbIgnorePut> then
+              Result
+                .AddPair(
+                  prpRtti.GetAttribute<FieldJsonBind>.FJsonName,
+                  __GetComponentToValue(aForm.FindComponent(prpRtti.Name)).ToString
+                );
+          end;
+          fbDelete:
+          begin
+            if not prpRtti.Tem<FbIgnoreDelete> then
+              Result
+                .AddPair(
+                  prpRtti.GetAttribute<FieldJsonBind>.FJsonName,
+                  __GetComponentToValue(aForm.FindComponent(prpRtti.Name)).ToString
+                );
+          end;
+        end;
       end;
     end;
   finally
