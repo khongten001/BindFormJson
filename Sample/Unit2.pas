@@ -10,28 +10,37 @@ uses
 type
   TForm2 = class(TForm)
 
-    [FieldJsonBind('Nome')]
+    [FieldJsonBind('Nome'), FbIgnoreDelete]
     Edit1: TEdit;
 
-    [FieldJsonBind('Telefone')]
+    [FieldJsonBind('Telefone'), FbIgnoreDelete]
     Edit2: TEdit;
 
-    [FieldJsonBind('Sexo')]
+    [FieldJsonBind('Sexo'), FbIgnoreDelete]
     ComboBox1: TComboBox;
 
-    [FieldJsonBind('Status')]
+    [FieldJsonBind('Status'), FbIgnoreDelete]
     CheckBox1: TCheckBox;
 
-    [FieldJsonBind('Tipo')]
+    [FieldJsonBind('Tipo'), FbIgnoreDelete]
     RadioGroup1: TRadioGroup;
 
+    [FieldJsonBind('Data'), FbIgnoreDelete]
+    DateTimePicker1: TDateTimePicker;
+
+    [FieldJsonBind('Id'), FbIgnorePost]
+    edtId: TEdit;
+
+    Button2: TButton;
+    Button3: TButton;
+    Button4: TButton;
     Memo1: TMemo;
     Button1: TButton;
 
-    [FieldJsonBind('Data')]
-    DateTimePicker1: TDateTimePicker;
-
     procedure Button1Click(Sender: TObject);
+    procedure Button2Click(Sender: TObject);
+    procedure Button3Click(Sender: TObject);
+    procedure Button4Click(Sender: TObject);
   private
     { Private declarations }
   public
@@ -43,13 +52,41 @@ var
 
 implementation
 
+uses
+  System.JSON;
+
 {$R *.dfm}
 
 
 procedure TForm2.Button1Click(Sender: TObject);
 begin
+  Memo1.Lines.Clear;
   Memo1.Lines.Add(
-    TBindFormJson.New.FormToJson(Self).ToString
+    TBindFormJson.New.FormToJson(Self, fbGet).ToString
+  );
+end;
+
+procedure TForm2.Button2Click(Sender: TObject);
+begin
+  Memo1.Lines.Clear;
+  Memo1.Lines.Add(
+    TBindFormJson.New.FormToJson(Self, fbPost).ToString
+  );
+end;
+
+procedure TForm2.Button3Click(Sender: TObject);
+begin
+  Memo1.Lines.Clear;
+  Memo1.Lines.Add(
+    TBindFormJson.New.FormToJson(Self, fbPut).ToString
+  );
+end;
+
+procedure TForm2.Button4Click(Sender: TObject);
+begin
+  Memo1.Lines.Clear;
+  Memo1.Lines.Add(
+    TBindFormJson.New.FormToJson(Self, fbDelete).ToString
   );
 end;
 
