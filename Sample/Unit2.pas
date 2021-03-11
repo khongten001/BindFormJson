@@ -5,7 +5,9 @@ interface
 uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.StdCtrls, Vcl.ExtCtrls, BindFormJson,
-  Vcl.ComCtrls;
+  Vcl.ComCtrls, FireDAC.Stan.Intf, FireDAC.Stan.Option, FireDAC.Stan.Param,
+  FireDAC.Stan.Error, FireDAC.DatS, FireDAC.Phys.Intf, FireDAC.DApt.Intf,
+  Data.DB, FireDAC.Comp.DataSet, FireDAC.Comp.Client;
 
 type
   TForm2 = class(TForm)
@@ -36,6 +38,7 @@ type
     Button4: TButton;
     Memo1: TMemo;
     Button1: TButton;
+    FDMemTable1: TFDMemTable;
 
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
@@ -59,35 +62,55 @@ uses
 
 
 procedure TForm2.Button1Click(Sender: TObject);
+var
+  aJson : TJsonObject;
 begin
   Memo1.Lines.Clear;
-  Memo1.Lines.Add(
-    TBindFormJson.New.FormToJson(Self, fbGet).ToString
-  );
+  aJson := TBindFormJson.New.FormToJson(Self, fbGet);
+  try
+    Memo1.Lines.Add(aJson.ToString);
+  finally
+    aJson.Free;
+  end;
 end;
 
 procedure TForm2.Button2Click(Sender: TObject);
+var
+  aJson : TJsonObject;
 begin
   Memo1.Lines.Clear;
-  Memo1.Lines.Add(
-    TBindFormJson.New.FormToJson(Self, fbPost).ToString
-  );
+  aJson := TBindFormJson.New.FormToJson(Self, fbPost);
+  try
+    Memo1.Lines.Add(aJson.ToString);
+  finally
+    aJson.Free;
+  end;
 end;
 
 procedure TForm2.Button3Click(Sender: TObject);
+var
+  aJson : TJsonObject;
 begin
   Memo1.Lines.Clear;
-  Memo1.Lines.Add(
-    TBindFormJson.New.FormToJson(Self, fbPut).ToString
-  );
+  aJson := TBindFormJson.New.FormToJson(Self, fbPut);
+  try
+    Memo1.Lines.Add(aJson.ToString);
+  finally
+    aJson.Free;
+  end;
 end;
 
 procedure TForm2.Button4Click(Sender: TObject);
+var
+  aJson : TJsonObject;
 begin
   Memo1.Lines.Clear;
-  Memo1.Lines.Add(
-    TBindFormJson.New.FormToJson(Self, fbDelete).ToString
-  );
+  aJson := TBindFormJson.New.FormToJson(Self, fbDelete);
+  try
+    Memo1.Lines.Add(aJson.ToString);
+  finally
+    aJson.Free;
+  end;
 end;
 
 end.

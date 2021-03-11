@@ -13,7 +13,8 @@ uses
   Vcl.Controls,
   Vcl.Dialogs,
   Vcl.StdCtrls,
-  Vcl.ExtCtrls;
+  Vcl.ExtCtrls,
+  Data.DB;
 
 type
 
@@ -21,6 +22,27 @@ type
   public
     function Tem<T: TCustomAttribute>: Boolean;
     function GetAttribute<T: TCustomAttribute>: T;
+  end;
+
+  TRttiTypeHelper = class helper for TRttiType
+  public
+    function Tem<T: TCustomAttribute>: Boolean;
+    function GetAttribute<T: TCustomAttribute>: T;
+  end;
+
+  ClassToBind = class(TCustomAttribute)
+    private
+    FTitle: String;
+    FPK: String;
+    FEndPoint: String;
+    procedure SetEndPoint(const Value: String);
+    procedure SetPK(const Value: String);
+    procedure SetTitle(const Value: String);
+    public
+      constructor Create(aEndPoint : String = ''; aPK : String = ''; aTitle : String = '');
+      property EndPoint : String read FEndPoint write SetEndPoint;
+      property PK : String read FPK write SetPK;
+      property Title : String read FTitle write SetTitle;
   end;
 
 
@@ -31,6 +53,24 @@ type
   public
     constructor Create(aJsonName: string);
     property JsonName : string read FJsonName write SetJsonName;
+  end;
+
+  FieldDataSetBind = class(TCustomAttribute)
+    private
+    FFieldName: String;
+    FDisplayName: String;
+    FWidth: Integer;
+    FVisible: Boolean;
+    procedure SetFieldName(const Value: String);
+    procedure SetDisplayName(const Value: String);
+    procedure SetWidth(const Value: Integer);
+    procedure SetVisible(const Value: Boolean);
+    public
+      constructor Create(aFieldName : String; aVisible : Boolean = True; aWidth : Integer = 50; aDisplayName : String = '');
+      property FieldName : String read FFieldName write SetFieldName;
+      property Width : Integer read FWidth write SetWidth;
+      property DisplayName : String read FDisplayName write SetDisplayName;
+      property Visible : Boolean read FVisible write SetVisible;
   end;
 
   FbIgnorePut = class(TCustomAttribute)
@@ -47,17 +87,25 @@ type
   iBindFormJson = interface
     ['{2846B843-7533-4987-B7B4-72F7B5654D1A}']
     function FormToJson(aForm : TForm; aType : TTypeBindFormJson) : TJsonObject;
+    procedure ClearFieldForm(aForm : TForm);
+    procedure BindDataSetToForm(aForm : TForm; aDataSet : TDataSet);
+    procedure BindFormatListDataSet(aForm : TForm; aDataSet : TDataSet);
+    procedure BindClassToForm (aForm : TForm; var aEndPoint : String; var aPK : String; var aTitle : String);
   end;
 
   TBindFormJson = class(TInterfacedObject, iBindFormJson)
     private
-      FJsonResult : TJsonObject;
       function __GetComponentToValue(aComponent: TComponent): TValue;
+      procedure __BindValueToComponent(aComponent: TComponent; aValue: Variant);
     public
       constructor Create;
       destructor Destroy; override;
       class function New : iBindFormJson;
       function FormToJson(aForm : TForm; aType : TTypeBindFormJson) : TJsonObject;
+      procedure ClearFieldForm(aForm : TForm);
+      procedure BindDataSetToForm(aForm : TForm; aDataSet : TDataSet);
+      procedure BindFormatListDataSet(aForm : TForm; aDataSet : TDataSet);
+      procedure BindClassToForm (aForm : TForm; var aEndPoint : String; var aPK : String; var aTitle : String);
   end;
 
 implementation
@@ -80,14 +128,134 @@ end;
 
 { TBindFormJson }
 
+procedure TBindFormJson.__BindValueToComponent(aComponent: TComponent;
+  aValue: Variant);
+begin
+  if VarIsNull(aValue) then exit;
+  if aComponent is TEdit then
+    (aComponent as TEdit).Text := aValue;
+  if aComponent is TComboBox then
+    (aComponent as TComboBox).ItemIndex := (aComponent as TComboBox).Items.IndexOf(aValue);
+  if aComponent is TRadioGroup then
+    (aComponent as TRadioGroup).ItemIndex := (aComponent as TRadioGroup).Items.IndexOf(aValue);
+  if aComponent is TCheckBox then
+    (aComponent as TCheckBox).Checked := aValue;
+  if aComponent is TTrackBar then
+    (aComponent as TTrackBar).Position := aValue;
+  if aComponent is TDateTimePicker then
+    (aComponent as TDateTimePicker).Date := aValue;
+  if aComponent is TShape then
+    (aComponent as TShape).Brush.Color := aValue;
+end;
+
+procedure TBindFormJson.BindClassToForm(aForm : TForm; var aEndPoint : String; var aPK : String; var aTitle : String);
+var
+  vCtxRtti: TRttiContext;
+  vTypRtti: TRttiType;
+begin
+  vCtxRtti := TRttiContext.Create;
+  try
+    vTypRtti := vCtxRtti.GetType(aForm.ClassInfo);
+    if vTypRtti.Tem<ClassToBind> then
+      aEndPoint := vTypRtti.GetAttribute<ClassToBind>.FEndPoint;
+      aPK := vTypRtti.GetAttribute<ClassToBind>.FPK;
+      aTitle := vTypRtti.GetAttribute<ClassToBind>.FTitle;
+  finally
+    vCtxRtti.Free;
+  end;
+end;
+
+procedure TBindFormJson.BindDataSetToForm(aForm: TForm; aDataSet: TDataSet);
+var
+  ctxRtti : TRttiContext;
+  typRtti : TRttiType;
+  prpRtti : TRttiField;
+begin
+  ctxRtti := TRttiContext.Create;
+  try
+    typRtti := ctxRtti.GetType(aForm.ClassInfo);
+    for prpRtti in typRtti.GetFields do
+    begin
+      if prpRtti.Tem<FieldDataSetBind> then
+      begin
+        __BindValueToComponent(
+                          aForm.FindComponent(prpRtti.Name),
+                          aDataSet.FieldByName(prpRtti.GetAttribute<FieldDataSetBind>.FFieldName).AsVariant
+        );
+      end;
+    end;
+  finally
+    ctxRtti.Free;
+  end;
+
+end;
+
+procedure TBindFormJson.BindFormatListDataSet(aForm: TForm; aDataSet: TDataSet);
+var
+  ctxRtti : TRttiContext;
+  typRtti : TRttiType;
+  prpRtti : TRttiField;
+begin
+  ctxRtti := TRttiContext.Create;
+  try
+    typRtti := ctxRtti.GetType(aForm.ClassInfo);
+    for prpRtti in typRtti.GetFields do
+    begin
+      if prpRtti.Tem<FieldDataSetBind> then
+      begin
+        aDataSet.FieldByName(prpRtti.GetAttribute<FieldDataSetBind>.FFieldName).Visible := prpRtti.GetAttribute<FieldDataSetBind>.FVisible;
+        aDataSet.FieldByName(prpRtti.GetAttribute<FieldDataSetBind>.FFieldName).DisplayLabel := prpRtti.GetAttribute<FieldDataSetBind>.FDisplayName;
+        aDataSet.FieldByName(prpRtti.GetAttribute<FieldDataSetBind>.FFieldName).DisplayWidth := prpRtti.GetAttribute<FieldDataSetBind>.FWidth;
+      end;
+    end;
+  finally
+    ctxRtti.Free;
+  end;
+
+end;
+
+procedure TBindFormJson.ClearFieldForm(aForm : TForm);
+var
+  ctxRtti : TRttiContext;
+  typRtti : TRttiType;
+  prpRtti : TRttiField;
+  aComponent : TComponent;
+begin
+  ctxRtti := TRttiContext.Create;
+  try
+    typRtti := ctxRtti.GetType(aForm.ClassInfo);
+    for prpRtti in typRtti.GetFields do
+    begin
+      aComponent := aForm.FindComponent(prpRtti.Name);
+      if aComponent is TEdit then
+        (aComponent as TEdit).Text := '';
+      if aComponent is TComboBox then
+        (aComponent as TComboBox).ItemIndex := -1;
+      if aComponent is TRadioGroup then
+        (aComponent as TRadioGroup).ItemIndex := -1;
+//      if aComponent is TCheckBox then
+//        (aComponent as TCheckBox).Checked := aValue;
+      if aComponent is TTrackBar then
+        (aComponent as TTrackBar).Position := 0;
+      if aComponent is TDateTimePicker then
+        (aComponent as TDateTimePicker).Date := now;
+//      if aComponent is TShape then
+//        (aComponent as TShape).Brush.Color := aValue;
+    end;
+  finally
+    ctxRtti.Free;
+  end;
+
+end;
+
 constructor TBindFormJson.Create;
 begin
-  FJsonResult := TJsonObject.Create;
+
 end;
 
 destructor TBindFormJson.Destroy;
 begin
-  FJsonResult.Free;
+
   inherited;
 end;
 
@@ -192,6 +360,78 @@ end;
 function TRttiFieldHelper.Tem<T>: Boolean;
 begin
   Result := GetAttribute<T> <> nil;
+end;
+
+{ FieldDataSetBind }
+
+constructor FieldDataSetBind.Create(aFieldName : String; aVisible : Boolean = True; aWidth : Integer = 50; aDisplayName : String = '');
+begin
+  FFieldName := aFieldName;
+  FWidth := aWidth;
+  FDisplayName := aDisplayName;
+  FVisible := aVisible;
+end;
+
+procedure FieldDataSetBind.SetDisplayName(const Value: String);
+begin
+  FDisplayName := Value;
+end;
+
+procedure FieldDataSetBind.SetFieldName(const Value: String);
+begin
+  FFieldName := Value;
+end;
+
+procedure FieldDataSetBind.SetVisible(const Value: Boolean);
+begin
+  FVisible := Value;
+end;
+
+procedure FieldDataSetBind.SetWidth(const Value: Integer);
+begin
+  FWidth := Value;
+end;
+
+{ ClassToBind }
+
+constructor ClassToBind.Create(aEndPoint, aPK, aTitle: String);
+begin
+  FEndPoint := aEndPoint;
+  FPK := aPK;
+  FTitle := aTitle;
+end;
+
+procedure ClassToBind.SetEndPoint(const Value: String);
+begin
+  FEndPoint := Value;
+end;
+
+procedure ClassToBind.SetPK(const Value: String);
+begin
+  FPK := Value;
+end;
+
+procedure ClassToBind.SetTitle(const Value: String);
+begin
+  FTitle := Value;
+end;
+
+{ TRttiTypeHelper }
+
+function TRttiTypeHelper.GetAttribute<T>: T;
+var
+  oAtributo: TCustomAttribute;
+begin
+  Result := nil;
+  for oAtributo in GetAttributes do
+    if oAtributo is T then
+      Exit((oAtributo as T));
+
+end;
+
+function TRttiTypeHelper.Tem<T>: Boolean;
+begin
+  Result := GetAttribute<T> <> nil
 end;
 
 end.
